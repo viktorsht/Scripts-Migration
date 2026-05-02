@@ -1,0 +1,39 @@
+{
+  "master": {
+    "host":          "192.168.18.159",
+    "ssh_user":      "cloud1",
+    "ssh_key":       "~/.ssh/id_rsa",
+    "db_container":  "users-mysql",
+    "api_container": "user-service",
+    "db_port":       3306,
+    "api_port":      8080,
+    "root_password": "users123",
+    "db":            "usersdb",
+    "server_id":     1,
+    "dump_dir":      "/home/cloud1"
+  },
+  "replica": {
+    "host":          "192.168.18.160",
+    "ssh_user":      "cloud2",
+    "ssh_key":       "~/.ssh/id_rsa",
+    "db_container":  "users-mysql",
+    "api_container": "user-service",
+    "db_port":       3306,
+    "api_port":      8080,
+    "root_password": "users123",
+    "db":            "usersdb",
+    "server_id":     2,
+    "mysql_image":   "mysql:8.0"
+  },
+  "api": {
+    "repo":        "https://github.com/viktorsht/sgpo-user.git",
+    "image":       "user-service",
+    "db_user":     "root",
+    "db_password": "users123",
+    "db_name":     "usersdb"
+  },
+  "replication": {
+    "user":     "replicador",
+    "password": "replica123"
+  }
+}

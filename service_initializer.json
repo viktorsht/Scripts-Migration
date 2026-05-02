@@ -1,0 +1,21 @@
+{
+  "host": "192.168.18.159",
+  "ssh_user": "cloud1",
+
+  "db": {
+    "container": "users-mysql",
+    "port": 3306,
+    "root_password": "users123",
+    "name": "usersdb",
+    "image": "mysql:8.0"
+  },
+  "api": {
+    "container": "user-service",
+    "port": 8080,
+    "repo": "https://github.com/viktorsht/sgpo-user.git",
+    "image": "user-service",
+    "db_user": "root",
+    "db_password": "users123",
+    "db_name": "usersdb"
+  }
+}

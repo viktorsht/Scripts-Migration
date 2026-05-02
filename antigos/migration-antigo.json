@@ -1,0 +1,28 @@
+{
+  "master": {
+    "host":           "192.168.18.159",
+    "ssh_user":       "cloud1",
+    "ssh_key":        "~/.ssh/id_rsa",
+    "container":      "users-mysql",
+    "port":           3306,
+    "root_password":  "users123",
+    "db":             "usersdb",
+    "server_id":      1,
+    "dump_dir":       "/home/cloud1"
+  },
+  "replica": {
+    "host":           "192.168.18.200",
+    "ssh_user":       "cloud2",
+    "ssh_key":        "~/.ssh/id_rsa",
+    "container":      "users-mysql",
+    "port":           3306,
+    "root_password":  "users123",
+    "db":             "usersdb",
+    "server_id":      2,
+    "mysql_image":    "mysql:8.0"
+  },
+  "replication": {
+    "user":           "replicador",
+    "password":       "replica123"
+  }
+}
