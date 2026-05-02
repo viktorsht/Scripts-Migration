@@ -484,6 +484,42 @@ if ! $API_OK; then
 fi
 
 # =============================================================================
+#  FASE 6 — REGISTRAR NO CONFIGSERVICE (opcional)
+# =============================================================================
+step "FASE 6/6 — Registrando no ConfigService"
+
+CS_URL=$(jp '.config_service.url   // empty')
+CS_FILE=$(jp '.config_service.config_file // empty')
+CS_HOST=$(jp '.config_service.host // empty')
+CS_USER=$(jp '.config_service.ssh_user // empty')
+CS_NAME=$(jp '.config_service.service_name // empty')
+
+if [[ -z "$CS_URL" ]]; then
+  warn "config_service não definido no JSON — pulando registro."
+else
+  info "Registrando '${CS_NAME}' → http://${HOST}:${API_PORT} no ConfigService..."
+
+  # Atualiza o services.json na máquina do ConfigService
+  ssh -i "$SSH_KEY" \
+      -o StrictHostKeyChecking=no \
+      -o LogLevel=ERROR \
+      "${CS_USER}@${CS_HOST}" \
+    "jq '.\"${CS_NAME}\" = \"http://${HOST}:${API_PORT}\"' ${CS_FILE} \
+        > /tmp/services_tmp.json \
+      && mv /tmp/services_tmp.json ${CS_FILE}"
+
+  # Dispara o reload
+  HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST "${CS_URL}/config/reload" 2>/dev/null || echo "000")
+
+  if [[ "$HTTP" == "200" ]]; then
+    success "Serviço '${CS_NAME}' registrado e ConfigService recarregado."
+  else
+    warn "ConfigService retornou HTTP ${HTTP}. Verifique manualmente."
+  fi
+fi
+
+# =============================================================================
 #  FINAL
 # =============================================================================
 echo ""

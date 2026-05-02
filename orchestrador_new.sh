@@ -355,6 +355,40 @@ $API_OK || {
 }
 
 # =============================================================================
+#  FASE 7.5 — ATUALIZAR CONFIGSERVICE
+# =============================================================================
+step "FASE 7.5/8 — Atualizando ConfigService"
+
+CONFIG_SERVICE_URL=$(jp '.config_service.url')  # ex: "http://192.168.18.159:8080"
+SERVICE_NAME=$(jp       '.config_service.service_name')  # ex: "users"
+
+if [[ -n "$CONFIG_SERVICE_URL" && "$CONFIG_SERVICE_URL" != "null" ]]; then
+
+  info "Atualizando IP do serviço '${SERVICE_NAME}' no ConfigService..."
+
+  # Substitui o IP antigo pelo novo no services.json
+  CONFIG_FILE=$(jp '.config_service.config_file')  # ex: "/opt/config/services.json"
+  CONFIG_HOST=$(jp '.config_service.host')
+  CONFIG_USER=$(jp '.config_service.ssh_user')
+
+  ssh_run "$CONFIG_HOST" "$CONFIG_USER" \
+    "sed -i 's|${O_HOST}|${D_HOST}|g' ${CONFIG_FILE}"
+
+  # Dispara o reload
+  HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X POST "${CONFIG_SERVICE_URL}/config/reload" 2>/dev/null || echo "000")
+
+  if [[ "$HTTP" == "200" ]]; then
+    success "ConfigService atualizado (HTTP ${HTTP})."
+  else
+    warn "ConfigService retornou HTTP ${HTTP}. Verifique manualmente."
+  fi
+
+else
+  warn "config_service não definido no JSON — pulando atualização."
+fi
+
+# =============================================================================
 #  FASE 8 — DESATIVAR ORIGEM
 # =============================================================================
 step "FASE 8/8 — Desativando sistema na origem"

@@ -1,5 +1,4 @@
 {
-    "server_dns": "192.168.18.156",
   "origin": {
     "host":          "192.168.18.159",
     "ssh_user":      "cloud1",
@@ -28,5 +27,12 @@
     "db_user":     "root",
     "db_password": "users123",
     "db_name":     "usersdb"
+  },
+    "config_service": {
+    "url":          "http://192.168.18.159:8080",
+    "host":         "192.168.18.159",
+    "ssh_user":     "ubuntu",
+    "config_file":  "/opt/config/services.json",
+    "service_name": "users"
   }
 }
