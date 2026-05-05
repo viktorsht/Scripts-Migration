@@ -179,37 +179,6 @@ done
 # =============================================================================
 #  FASE 2 — GARANTIR CONTAINER MYSQL NO DESTINO
 # =============================================================================
-# step "FASE 2/8 — Container MySQL no destino"
-
-# D_STATUS=$(ssh_cap "$D_HOST" "$D_USER" \
-#   "docker inspect ${D_DBC} --format='{{.State.Status}}' 2>/dev/null || echo absent")
-
-# case "$D_STATUS" in
-#   running)
-#     success "Container '${D_DBC}' já está rodando."
-#     ;;
-#   absent|"")
-#     info "Criando container '${D_DBC}' com imagem '${D_IMAGE}'..."
-#     ssh_run "$D_HOST" "$D_USER" \
-#       "docker run -d \
-#         --name ${D_DBC} \
-#         --restart unless-stopped \
-#         -e MYSQL_ROOT_PASSWORD=${D_PASS} \
-#         -e MYSQL_DATABASE=${D_DB} \
-#         -p ${D_DBPORT}:3306 \
-#         -v ${D_DBC}_data:/var/lib/mysql \
-#         ${D_IMAGE}" | while read -r l; do dim "$l"; done
-#     success "Container '${D_DBC}' criado."
-#     ;;
-#   exited|stopped|created)
-#     info "Container '${D_DBC}' está '${D_STATUS}' — iniciando..."
-#     ssh_run "$D_HOST" "$D_USER" "docker start ${D_DBC}" \
-#       | while read -r l; do dim "$l"; done
-#     ;;
-#   *)
-#     error "Estado inesperado do container no destino: '${D_STATUS}'"
-#     ;;
-# esac
 
 
 step "FASE 2/8 — Container MySQL no destino"
@@ -396,81 +365,6 @@ $API_OK || {
 # =============================================================================
 #  FASE 7.5 — ATUALIZAR CONFIGSERVICE
 # =============================================================================
-# step "FASE 7.5/8 — Atualizando ConfigService"
-
-# CONFIG_SERVICE_URL=$(jp '.config_service.url')  # ex: "http://192.168.18.159:8080"
-# SERVICE_NAME=$(jp       '.config_service.service_name')  # ex: "users"
-
-# if [[ -n "$CONFIG_SERVICE_URL" && "$CONFIG_SERVICE_URL" != "null" ]]; then
-
-#   info "Atualizando IP do serviço '${SERVICE_NAME}' no ConfigService..."
-
-#   # Substitui o IP antigo pelo novo no services.json
-#   CONFIG_FILE=$(jp '.config_service.config_file')  # ex: "/opt/config/services.json"
-#   CONFIG_HOST=$(jp '.config_service.host')
-#   CONFIG_USER=$(jp '.config_service.ssh_user')
-
-#   ssh_run "$CONFIG_HOST" "$CONFIG_USER" \
-#     "sed -i 's|${O_HOST}|${D_HOST}|g' ${CONFIG_FILE}"
-
-#   # Dispara o reload
-#   HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-#     -X POST "${CONFIG_SERVICE_URL}/config/reload" 2>/dev/null || echo "000")
-
-#   if [[ "$HTTP" == "200" ]]; then
-#     success "ConfigService atualizado (HTTP ${HTTP})."
-#   else
-#     warn "ConfigService retornou HTTP ${HTTP}. Verifique manualmente."
-#   fi
-
-# else
-#   warn "config_service não definido no JSON — pulando atualização."
-# fi
-
-
-# =============================================================================
-#  FASE 7.5 — ATUALIZAR CONFIGSERVICE
-# =============================================================================
-# step "FASE 7.5/8 — Atualizando ConfigService"
-
-# CONFIG_SERVICE_URL=$(jp '.config_service.url')        # http://192.168.18.159:8080
-# SERVICE_NAME=$(jp      '.config_service.service_name') # users
-# CONFIG_FILE=$(jp       '.config_service.config_file')  # /home/cloud1/config/services.json
-# CONFIG_HOST=$(jp       '.config_service.host')         # 192.168.18.159
-# CONFIG_USER=$(jp       '.config_service.ssh_user')     # cloud1
-
-# D_HOST=$(jp '.destination.host')   # 192.168.18.165
-# D_PORT=$(jp '.destination.api_port') # 8080
-
-# if [[ -z "$CONFIG_SERVICE_URL" || "$CONFIG_SERVICE_URL" == "null" ]]; then
-#   warn "config_service não definido no JSON — pulando atualização."
-# else
-#   info "Atualizando '${SERVICE_NAME}' → http://${D_HOST}:${D_PORT} no ConfigService..."
-
-#   # Atualiza o valor da chave corretamente via jq (mais seguro que sed)
-#   ssh_run -i "$SSH_KEY" \
-#       -o StrictHostKeyChecking=no \
-#       -o LogLevel=ERROR \
-#       "${CONFIG_USER}@${CONFIG_HOST}" \
-#     "jq '.\"${SERVICE_NAME}\" = \"http://${D_HOST}:${D_PORT}\"' ${CONFIG_FILE} \
-#         > /tmp/services_tmp.json \
-#       && mv /tmp/services_tmp.json ${CONFIG_FILE}"
-
-#   # Dispara o reload
-#   HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-#     -X POST "${CONFIG_SERVICE_URL}/config/reload" 2>/dev/null || echo "000")
-
-#   if [[ "$HTTP" == "200" ]]; then
-#     success "ConfigService atualizado: '${SERVICE_NAME}' → http://${D_HOST}:${D_PORT}"
-#   else
-#     warn "ConfigService retornou HTTP ${HTTP}. Verifique manualmente."
-#   fi
-# fi
-
-
-# =============================================================================
-#  FASE 7.5 — ATUALIZAR CONFIGSERVICE
-# =============================================================================
 step "FASE 7.5/8 — Atualizando ConfigService"
 
 CONFIG_SERVICE_URL=$(jp '.config_service.url')
@@ -484,10 +378,6 @@ if [[ -z "$CONFIG_SERVICE_URL" || "$CONFIG_SERVICE_URL" == "null" ]]; then
 else
   info "Atualizando '${SERVICE_NAME}' → http://${D_HOST}:${D_APIPORT} no ConfigService..."
 
-  # ssh_run "$CONFIG_HOST" "$CONFIG_USER" \
-  #   "jq '.\"${SERVICE_NAME}\" = \"http://${D_HOST}:${D_APIPORT}\"' ${CONFIG_FILE} \
-  #       > /tmp/services_tmp.json \
-  #     && mv /tmp/services_tmp.json ${CONFIG_FILE}"
   ssh -i "$SSH_KEY" \
       -o StrictHostKeyChecking=no \
       -o LogLevel=ERROR \
