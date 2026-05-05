@@ -1,0 +1,29 @@
+=== Migração concluída — Seg  4 Mai 2026 21:57:33 -03 ===
+
+ORIGEM (desativada)
+  Host:          192.168.18.159
+  DB container:  users-mysql  → REMOVIDO
+  API container: user-service → REMOVIDO
+
+DESTINO (ativo)
+  Host:          192.168.18.165
+  DB container:  users-mysql  (rodando)
+  API container: user-service (porta 8080)
+  API image:     user-service
+  DB URL:        jdbc:mysql://192.168.18.165:3306/usersdb
+
+DUMP
+  Gerado em:     192.168.18.159:/home/cloud1/mysql-dump-usersdb-20260504215718.sql
+  Importado em:  192.168.18.165:/home/cloud4/mysql-dump-usersdb-20260504215718.sql
+  Tamanho:       8.0K
+
+CHAVE SSH
+  Localização:   /Users/macbookair/Projetos/mestrado/scripts-banco/keys/ssh_migration_key
+  (mantenha esta chave para acessos futuros às VMs)
+
+COMANDOS ÚTEIS
+  # Logs da API:
+  ssh -i /Users/macbookair/Projetos/mestrado/scripts-banco/keys/ssh_migration_key cloud4@192.168.18.165 "docker logs -f user-service"
+
+  # Acessar banco:
+  ssh -i /Users/macbookair/Projetos/mestrado/scripts-banco/keys/ssh_migration_key cloud4@192.168.18.165     "docker exec -it users-mysql mysql -uroot -pusers123 usersdb"

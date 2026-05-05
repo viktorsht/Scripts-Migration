@@ -1,16 +1,10 @@
 {
-  "host":       "192.168.0.7",
+  "host":       "192.168.18.159",
   "ssh_user":   "cloud1",
 
   "container":   "config-service",
   "port":        "8080",
-  "repo":        "https://github.com/seu-usuario/ConfigService.git",
+  "repo":        "https://github.com/viktorsht/ConfigService.git",
   "image":       "config-service",
-  "config_dir":  "/opt/config",
-
-  "services": {
-    "users":   "http://192.168.0.7:8081",
-    "routes":  "http://192.168.0.7:8082",
-    "tickets": "http://192.168.0.7:8083"
-  }
+  "config_dir": "/home/cloud1/config"
 }

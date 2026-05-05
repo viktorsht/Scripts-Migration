@@ -11,7 +11,7 @@
   },
   "api": {
     "container": "user-service",
-    "port": 8080,
+    "port": 8081,
     "repo": "https://github.com/viktorsht/sgpo-user.git",
     "image": "user-service",
     "db_user": "root",
@@ -21,8 +21,8 @@
   "config_service": {
   "url":          "http://192.168.18.159:8080",
   "host":         "192.168.18.159",
-  "ssh_user":     "ubuntu",
-  "config_file":  "/opt/config/services.json",
+  "ssh_user":     "cloud1",
+  "config_file":  "/home/cloud1/config/services.json",
   "service_name": "users"
 }
 }

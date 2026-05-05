@@ -1,0 +1,28 @@
+{
+  "host": "192.168.18.162",
+  "ssh_user": "cloud3",
+
+  "db": {
+    "container": "tickets-mysql",
+    "port": 3306,
+    "root_password": "tickets123",
+    "name": "ticketsdb",
+    "image": "mysql:8.0"
+  },
+  "api": {
+    "container": "tickets-service",
+    "port": 8080,
+    "repo": "https://github.com/viktorsht/sgpo-tickets.git",
+    "image": "tickets-service",
+    "db_user": "root",
+    "db_password": "tickets123",
+    "db_name": "ticketsdb"
+  },
+  "config_service": {
+  "url":          "http://192.168.18.159:8080",
+  "host":         "192.168.18.159",
+  "ssh_user":     "cloud1",
+  "config_file":  "/home/cloud1/config/services.json",
+  "service_name": "tickets"
+}
+}

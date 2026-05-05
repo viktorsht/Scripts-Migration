@@ -461,7 +461,7 @@ step "FASE 5/5 — Health check da API"
 
 info "Aguardando API responder em http://${HOST}:${API_PORT} ..."
 API_OK=false
-for i in $(seq 1 24); do
+for i in $(seq 1 12); do
   HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
     --connect-timeout 3 \
     "http://${HOST}:${API_PORT}" 2>/dev/null || echo "000")

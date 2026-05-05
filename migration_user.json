@@ -1,26 +1,24 @@
 {
-  "master": {
+  "origin": {
     "host":          "192.168.18.159",
     "ssh_user":      "cloud1",
     "db_container":  "users-mysql",
     "api_container": "user-service",
     "db_port":       3306,
-    "api_port":      8080,
+    "api_port":      8081,
     "root_password": "users123",
     "db":            "usersdb",
-    "server_id":     1,
     "dump_dir":      "/home/cloud1"
   },
-  "replica": {
-    "host":          "192.168.18.160",
-    "ssh_user":      "cloud2",
+  "destination": {
+    "host":          "192.168.18.165",
+    "ssh_user":      "cloud4",
     "db_container":  "users-mysql",
     "api_container": "user-service",
     "db_port":       3306,
     "api_port":      8080,
     "root_password": "users123",
     "db":            "usersdb",
-    "server_id":     2,
     "mysql_image":   "mysql:8.0"
   },
   "api": {
@@ -30,8 +28,11 @@
     "db_password": "users123",
     "db_name":     "usersdb"
   },
-  "replication": {
-    "user":     "replicador",
-    "password": "replica123"
+    "config_service": {
+    "url":          "http://192.168.18.159:8080",
+    "host":         "192.168.18.159",
+    "ssh_user":     "cloud1",
+    "config_file":  "/home/cloud1/config/services.json",
+    "service_name": "users"
   }
 }

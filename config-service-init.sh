@@ -1,9 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
 # =============================================================================
-#  config-service-init.sh — Inicializa o ConfigService em um host
+#  config-service-init.sh — Inicializa o ConfigService em um host remoto
 #  Uso: ./config-service-init.sh config_service_init.json
 # =============================================================================
-set -euo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
@@ -16,7 +17,7 @@ step()    { echo -e "\n${BOLD}${CYAN}══ $* ${NC}"; }
 dim()     { echo -e "${DIM}    $*${NC}"; }
 
 # ── Dependências locais ────────────────────────────────────────────────────────
-for cmd in ssh ssh-keygen ssh-copy-id scp jq curl; do
+for cmd in ssh ssh-keygen ssh-copy-id scp jq curl mvn; do
   command -v "$cmd" &>/dev/null \
     || error "Dependência não encontrada: '$cmd'"
 done
@@ -30,14 +31,14 @@ jq empty "$CONFIG" 2>/dev/null || error "JSON inválido: $CONFIG"
 jp() { jq -r "$1" "$CONFIG"; }
 
 # ── Leitura do JSON ────────────────────────────────────────────────────────────
-HOST=$(jp     '.host')
-SSH_USER=$(jp '.ssh_user')
+HOST=$(jp      '.host')
+SSH_USER=$(jp  '.ssh_user')
 
 CS_CONTAINER=$(jp  '.container')
 CS_PORT=$(jp       '.port')
 CS_REPO=$(jp       '.repo')
 CS_IMAGE=$(jp      '.image')
-CS_CONFIG_DIR=$(jp '.config_dir')       # ex: /opt/config
+CS_CONFIG_DIR=$(jp '.config_dir')
 CS_CONFIG_FILE="${CS_CONFIG_DIR}/services.json"
 
 REPO_DIR=$(basename "$CS_REPO" .git)
@@ -47,7 +48,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEYS_DIR="${SCRIPT_DIR}/keys"
 SSH_KEY="${KEYS_DIR}/ssh_migration_key"
 
-# ── SSH helpers ────────────────────────────────────────────────────────────────
+# ── SSH helpers (mesmo padrão do service-init.sh) ─────────────────────────────
 ssh_cap() {
   ssh -i "$SSH_KEY" \
       -o BatchMode=yes \
@@ -93,7 +94,7 @@ read -rp "  Confirma inicialização? (s/N): " CONFIRM
 # =============================================================================
 #  FASE 0 — CHAVE SSH
 # =============================================================================
-step "FASE 0/5 — Chave SSH"
+step "FASE 0/6 — Chave SSH"
 
 mkdir -p "$KEYS_DIR"
 chmod 700 "$KEYS_DIR"
@@ -131,38 +132,96 @@ fi
 # =============================================================================
 #  FASE 1 — DOCKER
 # =============================================================================
-step "FASE 1/5 — Verificando Docker"
+step "FASE 1/6 — Verificando Docker"
 
-ssh_run "docker ps > /dev/null" \
-  || error "Docker não disponível em ${HOST}."
+ssh_cap "docker ps > /dev/null" | grep -q "" || \
+  ssh_run "docker ps > /dev/null" || \
+  error "Docker não disponível em ${HOST}."
+
 success "Docker OK."
 
 # =============================================================================
-#  FASE 2 — SERVICES.JSON
+#  FASE 2 — BUILD LOCAL DO JAR (no Mac, sem depender de internet na VM)
 # =============================================================================
-step "FASE 2/5 — Preparando services.json"
+step "FASE 2/6 — Build local do ConfigService"
 
-info "Criando diretório '${CS_CONFIG_DIR}' no host..."
-ssh_run "sudo mkdir -p ${CS_CONFIG_DIR} && sudo chown ${SSH_USER}:${SSH_USER} ${CS_CONFIG_DIR}"
+info "Clonando repositório localmente..."
+TMP_BUILD_DIR=$(mktemp -d)
+git clone "$CS_REPO" "$TMP_BUILD_DIR/$REPO_DIR" 2>&1 \
+  | while read -r l; do dim "$l"; done
 
-# Verifica se já existe um services.json no host
+info "Buildando JAR com Maven local (pode demorar)..."
+mvn -f "$TMP_BUILD_DIR/$REPO_DIR/pom.xml" \
+  clean package -DskipTests -q
+
+JAR_PATH=$(find "$TMP_BUILD_DIR/$REPO_DIR/target" -name "*.jar" ! -name "*sources*" | head -1)
+[[ -z "$JAR_PATH" ]] && error "JAR não encontrado após o build."
+
+JAR_NAME=$(basename "$JAR_PATH")
+success "JAR gerado: ${JAR_NAME}"
+
+# Dockerfile minimalista — sem Maven, sem download na VM
+cat > "$TMP_BUILD_DIR/Dockerfile" <<'DOCKERFILE'
+FROM eclipse-temurin:17-jre-jammy
+WORKDIR /app
+COPY app.jar app.jar
+EXPOSE 8080
+VOLUME ["/opt/config"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
+DOCKERFILE
+
+# =============================================================================
+#  FASE 3 — ENVIAR JAR + DOCKERFILE PARA A VM
+# =============================================================================
+step "FASE 3/6 — Enviando arquivos para a VM"
+
+REMOTE_BUILD_DIR="/home/${SSH_USER}/config-service-build"
+ssh_run "mkdir -p ${REMOTE_BUILD_DIR}"
+
+info "Enviando JAR (${JAR_NAME})..."
+scp -i "$SSH_KEY" \
+    -o StrictHostKeyChecking=no \
+    -o LogLevel=ERROR \
+    "$JAR_PATH" "${SSH_USER}@${HOST}:${REMOTE_BUILD_DIR}/app.jar"
+
+info "Enviando Dockerfile..."
+scp -i "$SSH_KEY" \
+    -o StrictHostKeyChecking=no \
+    -o LogLevel=ERROR \
+    "$TMP_BUILD_DIR/Dockerfile" "${SSH_USER}@${HOST}:${REMOTE_BUILD_DIR}/Dockerfile"
+
+rm -rf "$TMP_BUILD_DIR"
+success "Arquivos enviados para ${HOST}:${REMOTE_BUILD_DIR}"
+
+# =============================================================================
+#  FASE 4 — BUILD DA IMAGEM NA VM + SERVICES.JSON
+# =============================================================================
+step "FASE 4/6 — Build da imagem Docker na VM"
+
+info "Removendo container anterior (se existir)..."
+ssh_run "docker rm -f ${CS_CONTAINER} 2>/dev/null || true"
+
+info "Buildando imagem '${CS_IMAGE}'..."
+ssh_live "cd ${REMOTE_BUILD_DIR} && docker build -t ${CS_IMAGE} ."
+
+ssh_run "rm -rf ${REMOTE_BUILD_DIR}"
+success "Imagem '${CS_IMAGE}' pronta."
+
+# ── services.json ──────────────────────────────────────────────────────────────
+info "Preparando diretório '${CS_CONFIG_DIR}'..."
+ssh_run "mkdir -p ${CS_CONFIG_DIR} 2>/dev/null || true"
+
 EXISTING=$(ssh_cap "test -f ${CS_CONFIG_FILE} && echo yes || echo no")
 
 if [[ "$EXISTING" == "yes" ]]; then
   warn "Arquivo '${CS_CONFIG_FILE}' já existe no host."
   read -rp "  Sobrescrever com o do JSON de configuração? (s/N): " OVERWRITE
-  if [[ ! "$OVERWRITE" =~ ^[sS]$ ]]; then
-    success "Mantendo services.json existente no host."
-    SKIP_UPLOAD=true
-  else
-    SKIP_UPLOAD=false
-  fi
+  [[ "$OVERWRITE" =~ ^[sS]$ ]] && SKIP_UPLOAD=false || SKIP_UPLOAD=true
 else
   SKIP_UPLOAD=false
 fi
 
 if [[ "$SKIP_UPLOAD" == "false" ]]; then
-  # Extrai o bloco "services" do JSON de configuração e envia para o host
   SERVICES_JSON=$(jq -r '.services' "$CONFIG")
   if [[ "$SERVICES_JSON" == "null" || -z "$SERVICES_JSON" ]]; then
     warn "Nenhuma chave 'services' no JSON — criando services.json vazio."
@@ -184,26 +243,9 @@ if [[ "$SKIP_UPLOAD" == "false" ]]; then
 fi
 
 # =============================================================================
-#  FASE 3 — BUILD DA IMAGEM
+#  FASE 5 — SUBIR O CONTAINER
 # =============================================================================
-step "FASE 3/5 — Build da imagem"
-
-info "Removendo container anterior (se existir)..."
-ssh_run "docker rm -f ${CS_CONTAINER} 2>/dev/null || true"
-
-info "Clonando repositório '${CS_REPO}'..."
-ssh_run "rm -rf ${REPO_DIR} && git clone ${CS_REPO} 2>&1" \
-  | while read -r l; do dim "$l"; done
-
-info "Buildando imagem '${CS_IMAGE}' (pode demorar)..."
-ssh_live "cd ${REPO_DIR} && docker build -t ${CS_IMAGE} ."
-
-success "Imagem '${CS_IMAGE}' pronta."
-
-# =============================================================================
-#  FASE 4 — SUBIR O CONTAINER
-# =============================================================================
-step "FASE 4/5 — Subindo ConfigService"
+step "FASE 5/6 — Subindo ConfigService"
 
 info "Iniciando container '${CS_CONTAINER}'..."
 ssh_run "
@@ -219,9 +261,9 @@ ssh_run "
 success "Container '${CS_CONTAINER}' iniciado."
 
 # =============================================================================
-#  FASE 5 — HEALTH CHECK
+#  FASE 6 — HEALTH CHECK
 # =============================================================================
-step "FASE 5/5 — Health check"
+step "FASE 6/6 — Health check"
 
 info "Aguardando ConfigService responder em http://${HOST}:${CS_PORT}/health ..."
 CS_OK=false
@@ -246,7 +288,6 @@ if ! $CS_OK; then
   exit 1
 fi
 
-# Exibe os serviços carregados
 info "Serviços registrados:"
 curl -s "http://${HOST}:${CS_PORT}/config" \
   | jq . 2>/dev/null \
